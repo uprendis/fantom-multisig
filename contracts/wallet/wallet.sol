@@ -29,6 +29,7 @@ contract Voting {
         delegateCall = _delegateCall;
         data = _data;
 
+
         _approve(_creator);
     }
 
@@ -67,9 +68,21 @@ contract Wallet {
     mapping(address => bool) public isActive;
 
     // allow incoming FTM transfers
-    function() payable external {}
+    function() payable external {
+        require(msg.data.length == 0 && msg.value > 0, "not FTM transfer");
+    }
 
     constructor(address[] memory _voters, uint256 _threshold) public {
+        _setVoters(_voters, _threshold);
+    }
+
+    // _update is supposed to be called by itself during a proposal execution
+    function _update(address[] calldata _voters, uint256 _threshold) external {
+        require(msg.sender == address(this), "must be called by self");
+        _setVoters(_voters, _threshold);
+    }
+
+    function _setVoters(address[] memory _voters, uint256 _threshold) internal {
         require(_threshold > 0, "zero threshold");
         require(_threshold <= _voters.length, "too large threshold");
         voters = _voters;

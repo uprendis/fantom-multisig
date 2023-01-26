@@ -109,5 +109,31 @@ contract('Wallet', async ([account1, account2, account3, account4]) => {
             expect((await web3.eth.getBalance(callable.address)).toString()).to.equals('1');
             expect((await web3.eth.getBalance(wallet.address)).toString()).to.equals('0');
         });
+
+        it('Should update voters list', async () => {
+            let wallet = await Wallet.new([account1, account2, account3], 2);
+            await expectRevert(wallet._update([account1], 1, {from: account1}), 'must be called by self');
+            // means _update(account4, 1)
+            const calldata = '0x1b1b0bb2000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000' + account4.substring(2);
+            await wallet.proposeCall(wallet.address, 500000, 0, calldata, {from: account1});
+            let voting = await Voting.at((await wallet.last())[0]);
+            //console.log(await voting.data());
+            voting.approve({from: account2});
+            expect((await wallet.threshold.call()).toString()).to.equals('2');
+            //await wallet.debug(wallet.address, 0, false, calldata, {from: account1});
+            await voting.finalize({from: account1});
+            await expectRevert(voting.finalize({from: account3}), 'already finalized');
+            expect((await wallet.threshold.call()).toString()).to.equals('1');
+            expect((await wallet.voters.call(0)).toString()).to.equals(account4);
+
+            let callable = await DCallable.new();
+            await wallet.proposeDCall(callable.address, 100000, {from: account4});
+            voting = await Voting.at((await wallet.last())[0]);
+            await expectRevert(voting.approve({from: account4}), 'not a voter or already voted');
+            await expectRevert(voting.approve({from: account3}), 'not a voter or already voted');
+            await expectRevert(voting.approve({from: account2}), 'not a voter or already voted');
+            await expectRevert(voting.approve({from: account1}), 'not a voter or already voted');
+            voting.finalize.call({from: account2});
+        });
     });
 });
